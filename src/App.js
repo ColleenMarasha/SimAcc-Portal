@@ -14,7 +14,8 @@ import Footer from './components/Footer';
 // Import your page components
 import LoginPage from './pages/LoginPage';
 // Create a placeholder for Dashboard for now
-const DashboardPage = () => <h2>Dashboard Content Goes Here</h2>;
+import DashboardPage from './pages/DashboardPage';
+import ChangePasswordPage from './pages/ChangePasswordPage';
 const HomePage = () => <h2>Welcome Home!</h2>; // Optional: A simple home page
 
 function App() {
@@ -32,6 +33,7 @@ function App() {
 
           {/* Route for the Dashboard (Placeholder for now) */}
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/changePassword" element ={<ChangePasswordPage/>} />
 
           {/* Optional: Route for the Home Page */}
           <Route path="/" element={<HomePage />} />

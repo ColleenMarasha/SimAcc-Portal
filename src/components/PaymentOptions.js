@@ -56,7 +56,7 @@ const MobilePaymentsCard = () => (
        </div>
       <Card.Text>
         USSD Code: <br/>
-        <span className="text-monospace">*151*2*1*[AccountOrStandNo]#</span> {/* Example USSD code, text-monospace for fixed-width font */}
+        <span className="text-monospace">*153*3*1*[AccountNo]#</span> {/* Example USSD code, text-monospace for fixed-width font */}
       </Card.Text>
       <Card.Text className="mt-2 text-muted" style={{ fontSize: '0.8em' }}> {/* Smaller, muted text */}
          Supported: EcoCash • OneMoney • Telecash
