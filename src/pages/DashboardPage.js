@@ -91,7 +91,7 @@ function DashboardPage() {
                 >
                      <FaBell size={24} />
                      {/* Potential badge here */}
-                </div>
+                </div>  
 
                 {/* SimAcc Logo */}
                 <img

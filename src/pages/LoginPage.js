@@ -1,173 +1,164 @@
 import React, { useState } from 'react';
-// Import Bootstrap components
-import Container from 'react-bootstrap/Container';
-import Form from 'react-bootstrap/Form';
-import Button from 'react-bootstrap/Button';
-import Card from 'react-bootstrap/Card';
-
-// Import the reusable feedback components
-import ErrorMessage from '../components/ErrorMessage';
-import SuccessMessage from '../components/SuccessMessage';
-import LoadingSpinner from '../components/LoadingSpinner';
-
-// Import useNavigate from react-router-dom for redirection
-import { useNavigate } from 'react-router-dom';
+import { Form, Button, Spinner, Alert } from 'react-bootstrap';
+import { useNavigate } from 'react-router-dom'; // Assuming you use react-router-dom
+import { get, post, login } from '../utils/api';
 
 function LoginPage() {
-  // --- State Variables ---
-  // State for input fields
   const [accountNumber, setAccountNumber] = useState('');
-  const [password, setPassword] = useState('');
-  // State for feedback (loading, error, success)
-  const [isLoading, setIsLoading] = useState(false); // Controls spinner and form visibility
-  const [error, setError] = useState(null); // Holds error message text
-  const [successMessage, setSuccessMessage] = useState(null); // Holds success message text
+  const [otp, setOtp] = useState('');
+  const [otpMethod, setOtpMethod] = useState(null); // 'phone' or 'email'
+  const [currentStep, setCurrentStep] = useState('enterAccount'); // 'enterAccount', 'chooseMethod', 'enterOtp'
+  const [availableMethods, setAvailableMethods] = useState([]); // e.g., ['phone', 'email']
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  // --- React Router Hook ---
-  // Get the navigate function for redirection
   const navigate = useNavigate();
 
-  // --- Input Change Handlers ---
-  // Updates state when account number/username input changes
-  const handleAccountNumberChange = (event) => {
-    setAccountNumber(event.target.value);
-  };
-
-  // Updates state when password input changes
-  const handlePasswordChange = (event) => {
-    setPassword(event.target.value);
-  };
-
-  // --- Form Submission Handler ---
-  // This function runs when the login form is submitted
- 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-
-    setIsLoading(true);
+  const handleRequestOtp = async (e) => {
+    e.preventDefault();
     setError(null);
-    setSuccessMessage(null);
-
+    setLoading(true);
     try {
-      // *** Simulate an API call delay ***
-      console.log('Attempting login with:', { accountNumber, password });
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate network delay (e.g., 1.5 seconds)
+      // Call your backend API to request OTP
+      const response = await post('/login/request-otp', { accountNumber });
 
-      // *** Add the specific username and password check here for simulation ***
-      let apiResponse; // Declare apiResponse here
-
-      if (accountNumber === 'Colleen' && password === '0000') {
-        // Simulate a successful login response
-        apiResponse = { success: true, message: 'Login successful!' };
-      } else {
-        // Simulate a failed login response for incorrect credentials
-        apiResponse = { success: false, message: 'Invalid username or password.' };
-      }
-      // *** End of simulation check ***
-
-
-      // --- Handle the API response (this part remains the same) ---
-      if (apiResponse.success) {
-        setSuccessMessage(apiResponse.message);
-        // Redirect to the dashboard page upon successful login
-        // You would typically also save the user's authentication token here
-        navigate('/dashboard'); // Use the navigate function to change the route
+      // Backend should return available methods or confirm which one was used
+      if (response.data.success) {
+        setAvailableMethods(response.data.availableMethods || []); // e.g., ['phone', 'email']
+        // Decide the next step based on backend response
+        if (response.data.sentDirectly) { // If backend auto-sent to a default method
+             setCurrentStep('enterOtp');
+             // Maybe backend tells you which method it used? response.data.methodUsed
+             // setOtpMethod(response.data.methodUsed);
+             // Or you might handle this differently if no explicit choice is needed
+        } else if (response.data.availableMethods && response.data.availableMethods.length > 0) {
+             setCurrentStep('chooseMethod');
+        } else {
+             setError("Could not determine OTP method for this account.");
+        }
 
       } else {
-        // Display the error message from the API response
-        setError(apiResponse.message);
+        setError(response.data.message || 'Account not found or failed to initiate OTP.');
       }
-
     } catch (err) {
-      // Handle unexpected errors during the simulation delay or other issues
-      console.error('Simulation Error:', err); // Log the error for debugging
-      setError('An unexpected error occurred during login simulation.'); // Display a generic error message
-
+      setError(err.response?.data?.message || 'An error occurred while requesting OTP.');
     } finally {
-      setIsLoading(false); // Stop loading
+      setLoading(false);
     }
   };
 
+  const handleSendOtpByMethod = async (method) => {
+      setOtpMethod(method); // Set the chosen method
+      setError(null);
+      setLoading(true);
+      try {
+          // Call backend API to explicitly send OTP via the chosen method
+          const response = await post('/login/send-otp', { accountNumber, method });
+
+          if (response.data.success) {
+              setCurrentStep('enterOtp'); // Move to OTP input step
+          } else {
+              setError(response.data.message || `Failed to send OTP via ${method}.`);
+          }
+      } catch (err) {
+          setError(err.response?.data?.message || 'An error occurred while sending OTP.');
+      } finally {
+          setLoading(false);
+      }
+  };
 
 
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      // Call your backend API to verify the entered OTP
+      const response = await post('/login/verify-otp', {
+        accountNumber,
+        otp,
+        otpMethod // Send the method used for verification
+      });
 
-  // --- Component JSX (What gets rendered) ---
+      if (response.data.success) {
+        // Backend should return auth data, e.g., a token
+        localStorage.setItem('authToken', response.data.token); // Store the token
+        navigate('/dashboard'); // Redirect to dashboard
+      } else {
+        setError(response.data.message || 'Invalid OTP.');
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'An error occurred while verifying OTP.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    // Outer Container to center the card on the page
-    <Container className="d-flex justify-content-center align-items-center" style={{ minHeight: '80vh' }}>
-      {/* The Card component to visually contain the login form */}
-      <Card className="p-4 shadow-lg rounded" style={{ width: '25rem' }}>
-        <Card.Body>
-          {/* --- Conditional Rendering for Feedback (Spinner, Error, Success) --- */}
-          {/* Show spinner when isLoading is true */}
-          {isLoading && <LoadingSpinner />}
-          {/* Show error message when there is an error */}
-          {error && <ErrorMessage message={error} />}
-          {/* Show success message when there is a success message */}
-          {successMessage && <SuccessMessage message={successMessage} />}
+    <div className="login-container">
+      {/* Your layout/styling */}
+      <h2>Login</h2>
 
-          {/* --- Conditional Rendering for the Login Form and Title --- */}
-          {/* Show the title and form ONLY when not loading */}
-          {!isLoading && (
-            <> {/* Use a React Fragment to group multiple elements */}
-              {/* Card Title */}
-              <Card.Title className="text-center mb-4">SimAcc Portal Login</Card.Title>
+      {error && <Alert variant="danger">{error}</Alert>}
+      {loading && <Spinner animation="border" />}
 
-              {/* The Login Form */}
-              <Form onSubmit={handleSubmit}>
-                {/* Account Number / Username Field */}
-                <Form.Group className="mb-3" controlId="formBasicAccountNumber">
-                  <Form.Label>Account Number or Username</Form.Label>
-                  <Form.Control
-                    type="text"
-                    placeholder="Enter account number or username"
-                    value={accountNumber}
-                    onChange={handleAccountNumberChange}
-                    required
-                    // Disable input fields while loading is true
-                    disabled={isLoading}
-                  />
-                </Form.Group>
+      {currentStep === 'enterAccount' && (
+        <Form onSubmit={handleRequestOtp}>
+          <Form.Group controlId="formAccountNumber">
+            <Form.Label>Account Number</Form.Label>
+            <Form.Control
+              type="text"
+              placeholder="Enter your account number"
+              value={accountNumber}
+              onChange={(e) => setAccountNumber(e.target.value)}
+              required
+            />
+          </Form.Group>
+          <Button variant="primary" type="submit" disabled={loading}>
+            Request OTP
+          </Button>
+        </Form>
+      )}
 
-                {/* Password Field */}
-                <Form.Group className="mb-3" controlId="formBasicPassword">
-                  <Form.Label>Password</Form.Label>
-                  <Form.Control
-                    type="password"
-                    placeholder="Password"
-                    value={password}
-                    onChange={handlePasswordChange}
-                    required
-                    // Disable input field while loading is true
-                    disabled={isLoading}
-                  />
-                </Form.Group>
+      {currentStep === 'chooseMethod' && (
+           <div>
+               <p>Select where to send the OTP:</p>
+               {availableMethods.includes('phone') && (
+                    <Button variant="secondary" onClick={() => handleSendOtpByMethod('phone')} disabled={loading} className="me-2">
+                       Send to Phone
+                    </Button>
+               )}
+                {availableMethods.includes('email') && (
+                    <Button variant="secondary" onClick={() => handleSendOtpByMethod('email')} disabled={loading}>
+                        Send to Email
+                    </Button>
+                )}
+           </div>
+      )}
 
-                {/* Login Button */}
-                <Button
-                  variant="primary"
-                  type="submit"
-                  className="w-100 mt-3"
-                  // Disable the button while loading is true
-                  disabled={isLoading}
-                >
-                  Login
-                </Button>
-
-                {/* Link for Account Creation */}
-                <div className="text-center mt-3">
-                  <p className="text-muted mb-1">Don't have an account?</p>
-                  {/* Link to the registration page (assuming a /register route exists) */}
-                  <a href="/register" className="text-primary text-decoration-none">
-                    Create Account
-                  </a>
-                </div>
-              </Form>
-            </>
-          )}
-        </Card.Body>
-      </Card>
-    </Container>
+      {currentStep === 'enterOtp' && (
+        <Form onSubmit={handleVerifyOtp}>
+          <Form.Group controlId="formOtp">
+            <Form.Label>Enter 4-digit OTP</Form.Label>
+            {/* You might want to show where it was sent, e.g., "Sent to your phone ending in XXX" */}
+            <Form.Control
+              type="text" // Or type="number" with pattern="[0-9]{4}"
+              placeholder="Enter OTP"
+              value={otp}
+              onChange={(e) => setOtp(e.target.value)}
+              required
+              maxLength={4}
+              minLength={4}
+            />
+          </Form.Group>
+          <Button variant="primary" type="submit" disabled={loading}>
+            Verify OTP
+          </Button>
+          {/* Optional: Add a "Resend OTP" button */}
+          {/* <Button variant="link" onClick={handleResendOtp} disabled={loading}>Resend OTP</Button> */}
+        </Form>
+      )}
+    </div>
   );
 }
 
